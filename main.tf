@@ -1,16 +1,24 @@
 locals {
   external_dns_docker_image = "k8s.gcr.io/external-dns/external-dns:v${var.external_dns_version}"
   external_dns_version      = var.external_dns_version
+
+  default_name = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}-${random_string.suffix.result}"
+
+  iam_name = "eks-istio-external-dns-${lower(var.hosted_zone_id)}-${random_string.suffix.result}"
 }
 
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+}
 
 resource "kubernetes_service_account" "this" {
   automount_service_account_token = true
   metadata {
-    name      = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+    name      = local.default_name
     namespace = var.k8s_namespace
     labels = {
-      "app.kubernetes.io/name"       = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+      "app.kubernetes.io/name"       = local.default_name
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
@@ -18,10 +26,10 @@ resource "kubernetes_service_account" "this" {
 
 resource "kubernetes_cluster_role" "this" {
   metadata {
-    name = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+    name = local.default_name
 
     labels = {
-      "app.kubernetes.io/name"       = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+      "app.kubernetes.io/name"       = local.default_name
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
@@ -150,11 +158,11 @@ resource "kubernetes_deployment" "this" {
   depends_on = [kubernetes_cluster_role_binding.this]
 
   metadata {
-    name      = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+    name      = local.default_name
     namespace = var.k8s_namespace
 
     labels = {
-      "app.kubernetes.io/name"       = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+      "app.kubernetes.io/name"       = local.default_name
       "app.kubernetes.io/version"    = "v${local.external_dns_version}"
       "app.kubernetes.io/managed-by" = "terraform"
     }
@@ -170,7 +178,7 @@ resource "kubernetes_deployment" "this" {
 
     selector {
       match_labels = {
-        "app.kubernetes.io/name" = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+        "app.kubernetes.io/name" = local.default_name
       }
     }
 
@@ -182,7 +190,7 @@ resource "kubernetes_deployment" "this" {
       metadata {
         labels = merge(
           {
-            "app.kubernetes.io/name"    = "aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"
+            "app.kubernetes.io/name"    = local.default_name
             "app.kubernetes.io/version" = local.external_dns_version
           },
           var.k8s_pod_labels
@@ -199,7 +207,7 @@ resource "kubernetes_deployment" "this" {
                   match_expressions {
                     key      = "app.kubernetes.io/name"
                     operator = "In"
-                    values   = ["aws-eks-istio-external-dns-${lower(var.hosted_zone_id)}"]
+                    values   = [local.default_name]
                   }
                 }
                 topology_key = "kubernetes.io/hostname"
